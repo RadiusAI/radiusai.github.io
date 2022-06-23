@@ -1,0 +1,32 @@
+name: Update Index
+
+on:
+  workflow_dispatch: # This is used instead of the pull_request label type as the branch filter for expects the target branch and the closed trigger looks for base branch
+  repository_dispatch:
+    types: [update-index]
+
+jobs:
+  update-retl:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - name: Insert new build
+        env:
+          PKG_REF: ${{ github.event.client_payload.PKG_GITHUB_REF }}
+          PKG_GITHUB_REPO: ${{ github.event.client_payload.GITHUB_REPOSITORY }}
+        run: |
+          set -x
+          TAG_NAME=$(echo $PKG_REF | cut -d '/' -f3 )
+          echo "TAG_NAME $TAG_NAME"
+          IFS=/ read PKG_REPO_OWNER PKG_REPO <<< $PKG_GITHUB_REPO
+          mkdir -p "${PKG_REPO}"
+          cat << EOF >> "$PKG_REPO/index.html"
+          <a href="git+https://github.com/${PKG_REPO_OWNER}/${PKG_REPO}.git@${TAG_NAME}#egg=${PKG_REPO}-${TAG_NAME}" data-requires-python="&gt;=3.6.0">${PKG_REPO}-${TAG_NAME}</a><br/>
+          EOF
+          cat "$PKG_REPO/index.html"
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add "$PKG_REPO/index.html"
+          git status
+          git commit -m "Inserted ${PKG_REPO}-${TAG_NAME}"
+          git push
