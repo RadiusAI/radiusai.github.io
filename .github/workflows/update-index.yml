@@ -1,7 +1,6 @@
 name: Update Index
 
 on:
-  workflow_dispatch: # This is used instead of the pull_request label type as the branch filter for expects the target branch and the closed trigger looks for base branch
   repository_dispatch:
     types: [update-index]
 
@@ -20,7 +19,8 @@ jobs:
           echo "TAG_NAME $TAG_NAME"
           IFS=/ read PKG_REPO_OWNER PKG_REPO <<< $PKG_GITHUB_REPO
           mkdir -p "${PKG_REPO}"
-          cat << EOF >> "$PKG_REPO/index.html"
+          # Insert new package at line 1 of the index.html file. This is to ensure the newest package is grabbed by pip install without a pinned version
+          cat << EOF | cat - "$PKG_REPO/index.html" > temp && mv temp "$PKG_REPO/index.html"
           <a href="git+https://github.com/${PKG_REPO_OWNER}/${PKG_REPO}.git@${TAG_NAME}#egg=${PKG_REPO}-${TAG_NAME}" data-requires-python="&gt;=3.6.0">${PKG_REPO}-${TAG_NAME}</a><br/>
           EOF
           cat "$PKG_REPO/index.html"
