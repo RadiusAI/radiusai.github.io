@@ -21,15 +21,24 @@ You can also update to the latest published version:
 
 `pip install retl --upgrade --extra-index-url https://radiusai.github.io/`
 
-To avoid using the extra index url flag you can add an alias for `pip install` named `pip-install`. This is shell dependent:
+----
+To configure pip to include the custom repo, create a pip.conf file at: `~/.config/pip/pip.conf` and insert the following:  
 
-ZSH: `echo 'alias pip-install="pip install --extra-index-url https://radiusai.github.io/"' >> ~/.zshrc`  
-BASH: `echo 'alias pip-install="pip install --extra-index-url https://radiusai.github.io/"' >> ~/.bashrc`
+```
+[global]
+extra-index-url = https://radiusai.github.io/
+```
+
+If you're sure this file doesn't already exist, this command can be used:  
+`mkdir -p ~/.config/pip/ && printf "[global]\nextra-index-url = https://radiusai.github.io/" > ~/.config/pip/pip.conf`  
+
+----
 
 
-The extra index is checked after the public PyPi repository, so you may call `pip-install` instead of `pip install` for 
-all packages if desired:
+If you see:
+Username for 'https://github.com':
 
-`pip-install retl`  
-`pip-install retl --upgrade`  
-`pip-install retl==0.15.37`  
+Then you may not have HTTPS authentication setup for github.com.
+
+For Mac you can use the osxkeychain: `git config --global credential.helper osxkeychain`
+Use your RAI github username and Personal Access Token. These credentials should be store for the future.
