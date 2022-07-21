@@ -14,19 +14,36 @@ jobs:
           PKG_REF: ${{ github.event.client_payload.PKG_GITHUB_REF }}
           PKG_GITHUB_REPO: ${{ github.event.client_payload.GITHUB_REPOSITORY }}
         run: |
-          set -x
           TAG_NAME=$(echo $PKG_REF | cut -d '/' -f3 )
           echo "TAG_NAME $TAG_NAME"
           IFS=/ read PKG_REPO_OWNER PKG_REPO <<< $PKG_GITHUB_REPO
-          mkdir -p "${PKG_REPO}"
+          if ! grep -qw "$PKG_REPO" "index.html" # Check for package listing
+          then
+            echo "Package listing missing, creating"
+            sed -i "1s/.*/<div class=\"package\">\n<a href=\"$PKG_REPO\/\">$PKG_REPO<\/a><\/br>/" index.html # Inserts new package at the first line
+            mkdir -p "${PKG_REPO}"
+            touch "${PKG_REPO}/index.html"
+            git add "index.html"
+          else
+            echo "Package listing found..OK"
+          fi
+          if grep -qw "$TAG_NAME" "$PKG_REPO/index.html" # Check for package version
+          then
+            echo "A package with this version already exists: $TAG_NAME"
+            exit 1
+          else
+            echo "Duplicate version not found...OK"
+          fi
           # Insert new package at line 1 of the index.html file. This is to ensure the newest package is grabbed by pip install without a pinned version
           cat << EOF | cat - "$PKG_REPO/index.html" > temp && mv temp "$PKG_REPO/index.html"
           <a href="git+https://github.com/${PKG_REPO_OWNER}/${PKG_REPO}.git@${TAG_NAME}#egg=${PKG_REPO}-${TAG_NAME}" data-requires-python="&gt;=3.6.0">${PKG_REPO}-${TAG_NAME}</a><br/>
           EOF
+          echo "New package list:"
           cat "$PKG_REPO/index.html"
+          echo "Saving changes..."
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git add "$PKG_REPO/index.html"
+          git add "$PKG_REPO"
           git status
           git commit -m "Inserted ${PKG_REPO}-${TAG_NAME}"
           git push
