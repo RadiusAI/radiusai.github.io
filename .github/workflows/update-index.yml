@@ -6,17 +6,16 @@ on:
 
 jobs:
   update-index:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
       - name: Insert new build
+        id: update-index
         env:
-          PKG_REF: ${{ github.event.client_payload.PKG_GITHUB_REF }}
-          PKG_GITHUB_REPO: ${{ github.event.client_payload.GITHUB_REPOSITORY }}
+          TAG_NAME: ${{ github.event.client_payload.TAG_NAME }}
+          PKG_REPO_OWNER: ${{ github.event.client_payload.PKG_REPO_OWNER }}
+          PKG_REPO: ${{ github.event.client_payload.PKG_REPO }}
         run: |
-          TAG_NAME=$(echo $PKG_REF | cut -d '/' -f3 )
-          echo "TAG_NAME $TAG_NAME"
-          IFS=/ read PKG_REPO_OWNER PKG_REPO <<< $PKG_GITHUB_REPO
           if ! grep -qw "$PKG_REPO" "index.html" # Check for package listing
           then
             echo "Package listing missing, creating"
@@ -47,3 +46,28 @@ jobs:
           git status
           git commit -m "Inserted ${PKG_REPO}-${TAG_NAME}"
           git push
+
+  notify-slack:
+    if: github.event.client_payload.SLACK_NOTIFY == 'true'
+    name: Notify Slack
+    needs: update-index
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Send Slack message
+        uses: slackapi/slack-github-action@v1.19.0
+        with:
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "New python package `${{ github.event.client_payload.PKG_REPO }}` is available with version `${{ github.event.client_payload.TAG_NAME }}`. If you are using this package please update your package references in requirements.txt files. For questions and concerns, please use the #cicd channel."
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
