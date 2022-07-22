@@ -69,11 +69,11 @@ jobs:
           fi
       - name: Variable Check
         run: |
-          echo "SLACK_NOTIFY: ${{ steps.slack-flag.outputs.SLACK_NOTIFY }}
-          echo "TAG_NAME: ${{ github.event.client_payload.GITHUB_REF_NAME }}
-          echo "PKG_REPO_OWNER: ${{ steps.update-index.outputs.PKG_REPO_OWNER }}
-          echo "PKG_REPO: ${{ steps.update-index.outputs.PKG_REPO }}
-          echo "PACKAGE_NAME: ${{ steps.update-index.outputs.PACKAGE_NAME }}
+          echo "SLACK_NOTIFY: ${{ steps.slack-flag.outputs.SLACK_NOTIFY }}"
+          echo "TAG_NAME: ${{ github.event.client_payload.GITHUB_REF_NAME }}"
+          echo "PKG_REPO_OWNER: ${{ steps.update-index.outputs.PKG_REPO_OWNER }}"
+          echo "PKG_REPO: ${{ steps.update-index.outputs.PKG_REPO }}"
+          echo "PACKAGE_NAME: ${{ steps.update-index.outputs.PACKAGE_NAME }}"
     outputs:
       SLACK_NOTIFY: ${{ steps.slack-flag.outputs.SLACK_NOTIFY }} # Make step output available to next job
       PACKAGE_NAME: ${{ steps.update-index.outputs.PACKAGE_NAME }}
