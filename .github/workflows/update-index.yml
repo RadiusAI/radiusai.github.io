@@ -84,9 +84,9 @@ jobs:
         uses: slackapi/slack-github-action@v1.19.0
         with:
           payload: |
-          {
-            "package_name": "${{ needs.update-index.outputs.PKG_REPO }}",
-            "package_version": "${{ github.event.client_payload.GITHUB_REF_NAME }}"
-          }
+            {
+              "package_name": "${{ needs.update-index.outputs.PKG_REPO }}",
+              "package_version": "${{ github.event.client_payload.GITHUB_REF_NAME }}"
+            }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
