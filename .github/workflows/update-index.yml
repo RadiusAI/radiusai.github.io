@@ -9,13 +9,15 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: main # This is the Github Pages branch we are trying to push commits to
       - name: Insert new build
         id: update-index
-        env:
-          TAG_NAME: ${{ github.event.client_payload.TAG_NAME }}
-          PKG_REPO_OWNER: ${{ github.event.client_payload.PKG_REPO_OWNER }}
-          PKG_REPO: ${{ github.event.client_payload.PKG_REPO }}
         run: |
+          TAG_NAME=${{ github.event.client_payload.GITHUB_REF_NAME }}
+          IFS=/ read PKG_REPO_OWNER PKG_REPO <<< ${{ github.event.client_payload.GITHUB_REPOSITORY }}
+          echo "::set-output name=PKG_REPO_OWNER::$PKG_REPO_OWNER"
+          echo "::set-output name=PKG_REPO::$PKG_REPO"
           if ! grep -qw "$PKG_REPO" "index.html" # Check for package listing
           then
             echo "Package listing missing, creating"
@@ -46,9 +48,34 @@ jobs:
           git status
           git commit -m "Inserted ${PKG_REPO}-${TAG_NAME}"
           git push
+      - name: Set Slack Flag
+        id: slack-flag
+        env:
+          TAG_NAME: ${{ github.event.client_payload.GITHUB_REF_NAME }}
+        run: |
+          final='^([0-9]+\.){0,2}(\*|[0-9]+)$'
+          beta='^([0-9]+\.){0,2}(\*|[0-9]+)(\*|b[0-9]+)$'
+          alpha='^([0-9]+\.){0,2}(\*|[0-9]+)(\*|a[0-9]+)$'
+          if [[ $TAG_NAME =~ $final ]] || [[ $TAG_NAME =~ $beta ]]
+          then
+            echo "Sending slack message"
+            echo "::set-output name=SLACK_NOTIFY::true"
+          else
+            echo "Not sending slack message"
+            echo "::set-output name=SLACK_NOTIFY::false"
+          fi
+      - name: Variable Check
+        run: |
+          echo "SLACK_NOTIFY: ${{ steps.slack-flag.outputs.SLACK_NOTIFY }}
+          echo "TAG_NAME: ${{ github.event.client_payload.GITHUB_REF_NAME }}
+          echo "PKG_REPO_OWNER: ${{ steps.update-index.outputs.PKG_REPO_OWNER }}
+          echo "PKG_REPO: ${{ steps.update-index.outputs.PKG_REPO }}
+    outputs:
+      SLACK_NOTIFY: ${{ steps.slack-flag.outputs.SLACK_NOTIFY }} # Make step output available to next job
+      PKG_REPO: ${{ steps.update-index.outputs.PKG_REPO }}
 
   notify-slack:
-    if: github.event.client_payload.SLACK_NOTIFY == 'true'
+    if: needs.update-index.outputs.SLACK_NOTIFY == 'true'
     name: Notify Slack
     needs: update-index
     runs-on: ubuntu-22.04
@@ -63,7 +90,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "New python package `${{ github.event.client_payload.PKG_REPO }}` is available with version `${{ github.event.client_payload.TAG_NAME }}`. If you are using this package please update your package references in requirements.txt files. For questions and concerns, please use the #cicd channel."
+                    "text": "New python package `${{ needs.update-index.outputs.PKG_REPO }}` is available with version `${{ github.event.client_payload.GITHUB_REF_NAME }}`. If you are using this package please update your package references in requirements.txt files. For questions and concerns, please use the #cicd channel."
                   }
                 }
               ]
