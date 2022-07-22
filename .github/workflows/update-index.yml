@@ -13,22 +13,25 @@ jobs:
           ref: main # This is the Github Pages branch we are trying to push commits to
       - name: Insert new build
         id: update-index
+        env:
+          TAG_NAME: ${{ github.event.client_payload.GITHUB_REF_NAME }}
+          PACKAGE_NAME: ${{ github.event.client_payload.PACKAGE_NAME }}
         run: |
-          TAG_NAME=${{ github.event.client_payload.GITHUB_REF_NAME }}
           IFS=/ read PKG_REPO_OWNER PKG_REPO <<< ${{ github.event.client_payload.GITHUB_REPOSITORY }}
           echo "::set-output name=PKG_REPO_OWNER::$PKG_REPO_OWNER"
           echo "::set-output name=PKG_REPO::$PKG_REPO"
-          if ! grep -qw "$PKG_REPO" "index.html" # Check for package listing
+          echo "::set-output name=PACKAGE_NAME::$PACKAGE_NAME"
+          if ! grep -qw "$PACKAGE_NAME" "index.html" # Check for package listing
           then
             echo "Package listing missing, creating"
-            sed -i "1s/.*/<div class=\"package\">\n<a href=\"$PKG_REPO\/\">$PKG_REPO<\/a><\/br>/" index.html # Inserts new package at the first line
-            mkdir -p "${PKG_REPO}"
-            touch "${PKG_REPO}/index.html"
+            sed -i "1s/.*/<div class=\"package\">\n<a href=\"$PACKAGE_NAME\/\">$PACKAGE_NAME<\/a><\/br>/" index.html # Inserts new package at the first line
+            mkdir -p "${PACKAGE_NAME}"
+            touch "${PACKAGE_NAME}/index.html"
             git add "index.html"
           else
             echo "Package listing found..OK"
           fi
-          if grep -qw "$TAG_NAME" "$PKG_REPO/index.html" # Check for package version
+          if grep -qw "$TAG_NAME" "$PACKAGE_NAME/index.html" # Check for package version
           then
             echo "A package with this version already exists: $TAG_NAME"
             exit 1
@@ -36,17 +39,17 @@ jobs:
             echo "Duplicate version not found...OK"
           fi
           # Insert new package at line 1 of the index.html file. This is to ensure the newest package is grabbed by pip install without a pinned version
-          cat << EOF | cat - "$PKG_REPO/index.html" > temp && mv temp "$PKG_REPO/index.html"
-          <a href="git+https://github.com/${PKG_REPO_OWNER}/${PKG_REPO}.git@${TAG_NAME}#egg=${PKG_REPO}-${TAG_NAME}" data-requires-python="&gt;=3.6.0">${PKG_REPO}-${TAG_NAME}</a><br/>
+          cat << EOF | cat - "$PACKAGE_NAME/index.html" > temp && mv temp "$PACKAGE_NAME/index.html"
+          <a href="git+https://github.com/${PKG_REPO_OWNER}/${PKG_REPO}.git@${TAG_NAME}#egg=${PACKAGE_NAME}-${TAG_NAME}" data-requires-python="&gt;=3.6.0">${PACKAGE_NAME}-${TAG_NAME}</a><br/>
           EOF
           echo "New package list:"
-          cat "$PKG_REPO/index.html"
+          cat "$PACKAGE_NAME/index.html"
           echo "Saving changes..."
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git add "$PKG_REPO"
+          git add "$PACKAGE_NAME"
           git status
-          git commit -m "Inserted ${PKG_REPO}-${TAG_NAME}"
+          git commit -m "Inserted ${PACKAGE_NAME}-${TAG_NAME}"
           git push
       - name: Set Slack Flag
         id: slack-flag
@@ -70,9 +73,10 @@ jobs:
           echo "TAG_NAME: ${{ github.event.client_payload.GITHUB_REF_NAME }}
           echo "PKG_REPO_OWNER: ${{ steps.update-index.outputs.PKG_REPO_OWNER }}
           echo "PKG_REPO: ${{ steps.update-index.outputs.PKG_REPO }}
+          echo "PACKAGE_NAME: ${{ steps.update-index.outputs.PACKAGE_NAME }}
     outputs:
       SLACK_NOTIFY: ${{ steps.slack-flag.outputs.SLACK_NOTIFY }} # Make step output available to next job
-      PKG_REPO: ${{ steps.update-index.outputs.PKG_REPO }}
+      PACKAGE_NAME: ${{ steps.update-index.outputs.PACKAGE_NAME }}
 
   notify-slack:
     if: ${{ needs.update-index.outputs.SLACK_NOTIFY == 'true' }}
@@ -85,7 +89,7 @@ jobs:
         with:
           payload: |
             {
-              "package_name": "${{ needs.update-index.outputs.PKG_REPO }}",
+              "package_name": "${{ needs.update-index.outputs.PACKAGE_NAME }}",
               "package_version": "${{ github.event.client_payload.GITHUB_REF_NAME }}"
             }
         env:
